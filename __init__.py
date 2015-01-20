@@ -1,28 +1,29 @@
-import traceback
-
-__author__ = 'Christian Murphy'
 import ConfigParser
 import praw
 import re
 import time
 import pyteaser
+import traceback
 
-#Get the account password from the config stored with the bot
+# Get the account password from the config stored with the bot
 config = ConfigParser.ConfigParser()
 config.read('account.cfg')
 
-#Create the Reddit instance for all requests
+
+# Create the Reddit instance for all requests
 reddit = praw.Reddit(user_agent='TLDRify , the summarizer-bot by /u/grimpunch v1.0'
                                 'URL: http://tldrbot.christiancod.es')
 
-#Parse account details from config and login
+
+# Parse account details from config and login
 username = config.get('AccountDetails', 'user', raw=True)
 password = config.get('AccountDetails', 'pass', raw=True)
 reddit.login(username, password)
 
 alreadyDone = set()
 
-def TLDRAlready(text):
+
+def tldr_already(text):
     if re.findall('((i)T[^\w]*L[^\w]*D[^\w]*R)', text).__len__() > 0:
         return True
     else:
@@ -50,6 +51,7 @@ def create_summaries_from_url(title, url):
 
 print 'TLDRify online - Logged in and running'
 
+
 def main():
     subreddit = reddit.get_subreddit('testingground4bots')
     for submission in subreddit.get_hot(limit=20):
@@ -73,7 +75,7 @@ def main():
                 print 'Posted a TLDR successfully'
             else:
                 op_text = submission.selftext
-                if not (TLDRAlready(op_text)) and op_text.__len__() > 1000:
+                if not (tldr_already(op_text)) and op_text.__len__() > 1000:
                     print 'Post Length:', op_text.__len__()
                     print 'Post Title', submission.title
                     print 'Post ID', submission.id
