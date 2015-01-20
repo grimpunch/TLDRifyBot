@@ -1,1 +1,3 @@
 *.cfg
+.idea/*
+.idea
