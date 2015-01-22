@@ -50,7 +50,7 @@ def create_summaries(title, text):
         return None
     formatted_summary = u'##TLDR: \n\n' + title + u':\n\n'
     for summary in summaries:
-        formatted_summary += u'- ' + summary + u'\n\n'
+        formatted_summary += u'- ' + summary.decode('utf-8', errors='ignore') + u'\n\n'
     return formatted_summary
 
 
@@ -66,7 +66,7 @@ def create_summaries_from_url(title, url):
         return None
     formatted_summary = u'##TLDR: \n\n' + title + u':\n\n'
     for summary in summaries:
-        formatted_summary += u'- ' + summary + u'\n\n'
+        formatted_summary += u'- ' + summary.decode('utf-8', errors='ignore') + u'\n\n'
     return formatted_summary
 
 
@@ -74,7 +74,7 @@ def main():
     subreddit = reddit.get_subreddit('testingground4bots')
     global posted_this_iteration
     for submission in subreddit.get_new(limit=100):
-        if submission.id not in alreadyDone.__iter__():
+        if submission.id not in alreadyDone:
             if 'reddit.com' not in submission.url:
                 op_url = submission.url
                 print 'Post Title', submission.title
@@ -82,7 +82,7 @@ def main():
                 alreadyDone.add(submission.id)
                 summary = create_summaries_from_url(submission.title, op_url)
                 if summary.__len__() > 1200:
-                    print 'Summary Length:' , summary.__len__()
+                    print 'Summary Length:', summary.__len__()
                     print 'Rejected for length exceeded'
                 submission.add_comment(summary)
                 posted_this_iteration = True
@@ -97,7 +97,7 @@ def main():
                     alreadyDone.add(submission.id)
                     summary = create_summaries(submission.title, op_text)
                     if summary.__len__() > 750 and 'No Summary' not in summary:
-                        print 'Summary Length:' , summary.__len__()
+                        print 'Summary Length:', summary.__len__()
                         print 'Rejected for length exceeded'
                     submission.add_comment(summary)
                     posted_this_iteration = True
