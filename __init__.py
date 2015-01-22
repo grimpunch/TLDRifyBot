@@ -73,12 +73,7 @@ def create_summaries_from_url(title, url):
 def main():
     subreddit = reddit.get_subreddit('testingground4bots')
     global posted_this_iteration
-    for submission in subreddit.get_hot(limit=20):
-        try:
-            print 'Post Title', submission.title
-            print 'Post url', submission.url
-        except:
-            pass
+    for submission in subreddit.get_new(limit=100):
         if submission.id not in alreadyDone.__iter__():
             if 'reddit.com' not in submission.url:
                 op_url = submission.url
