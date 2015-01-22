@@ -84,8 +84,7 @@ def main():
                 if summary.__len__() > 1200:
                     print 'Summary Length:' , summary.__len__()
                     print 'Rejected for length exceeded'
-                msg = summary
-                submission.add_comment(msg)
+                submission.add_comment(summary)
                 posted_this_iteration = True
                 print 'Posted a Link Post TLDR successfully:', submission.title,
                 return
@@ -100,8 +99,7 @@ def main():
                     if summary.__len__() > 750 and 'No Summary' not in summary:
                         print 'Summary Length:' , summary.__len__()
                         print 'Rejected for length exceeded'
-                    msg = summary
-                    submission.add_comment(msg)
+                    submission.add_comment(summary)
                     posted_this_iteration = True
                     print 'Posted a TLDR successfully', submission.title
                     return
