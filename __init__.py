@@ -38,25 +38,12 @@ def tldr_already(text):
         return False
 
 
-def create_summaries(title, text):
+def create_summaries(title=None, text=None, url=None):
     try:
-        summaries = pyteaser.Summarize(title, text)
-    except Exception as e:
-        print e
-        print 'No Summary Could Be Generated'
-        return None
-    if not summaries:
-        print 'No Summary Could Be Generated'
-        return None
-    formatted_summary = u'##TLDR: \n\n' + title + u':\n\n'
-    for summary in summaries:
-        formatted_summary += u'- ' + summary.decode('utf-8', errors='ignore') + u'\n\n'
-    return formatted_summary
-
-
-def create_summaries_from_url(title, url):
-    try:
-        summaries = pyteaser.SummarizeUrl(url)
+        if url:
+            summaries = pyteaser.SummarizeUrl(url)
+        else:
+            summaries = pyteaser.Summarize(title, text)
     except Exception as e:
         print e
         print 'No Summary Could Be Generated'
@@ -80,7 +67,7 @@ def main():
                 print 'Post Title', submission.title
                 print 'Post ID', submission.id
                 alreadyDone.add(submission.id)
-                summary = create_summaries_from_url(submission.title, op_url)
+                summary = create_summaries(title=submission.title, url=op_url)
                 if summary.__len__() > 1200:
                     print 'Summary Length:', summary.__len__()
                     print 'Rejected for length exceeded'
@@ -95,7 +82,7 @@ def main():
                     print 'Post Title', submission.title
                     print 'Post ID', submission.id
                     alreadyDone.add(submission.id)
-                    summary = create_summaries(submission.title, op_text)
+                    summary = create_summaries(title=submission.title, text=op_text)
                     if summary.__len__() > 750 and 'No Summary' not in summary:
                         print 'Summary Length:', summary.__len__()
                         print 'Rejected for length exceeded'
