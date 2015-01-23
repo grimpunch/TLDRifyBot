@@ -1,4 +1,6 @@
 import ConfigParser
+from random import random
+from bisect import bisect
 import praw
 import re
 import time
@@ -7,14 +9,14 @@ import traceback
 
 global posted_this_iteration
 
-# Configurables: ----------------
+# System Configuration: ----------------
 sleep_time = 5*60
+subreddit_to_scan = 'testingground4bots'
 #################################
 
 # Get the account password from the config stored with the bot
 config = ConfigParser.ConfigParser()
 config.read('account.cfg')
-
 
 # Create the Reddit instance for all requests
 reddit = praw.Reddit(user_agent='TLDRify , the summarizer-bot by /u/grimpunch v1.0'
@@ -26,9 +28,26 @@ username = config.get('AccountDetails', 'user', raw=True)
 password = config.get('AccountDetails', 'pass', raw=True)
 reddit.login(username, password)
 
-alreadyDone = set()
+posts_already_done = set()
+comments_already_done = set()
 
 print 'TLDRify online - Logged in and running'
+
+
+def get_subreddit():
+    return reddit.get_subreddit(subreddit_to_scan)
+
+
+def weighted_choice(choices):
+    values, weights = zip(*choices)
+    total = 0
+    cum_weights = []
+    for w in weights:
+        total += w
+        cum_weights.append(total)
+    x = random() * total
+    i = bisect(cum_weights, x)
+    return values[i]
 
 
 def tldr_already(text):
@@ -57,16 +76,77 @@ def create_summaries(title=None, text=None, url=None):
     return formatted_summary
 
 
-def main():
+def check_for_requests():
+    print 'Checking for Requests'
+    subreddit = get_subreddit()
+    global posted_this_iteration
+    for comment in subreddit.get_comments():
+        cid = str(comment.id)
+        match = re.search('TL;?DR please', comment.body, re.IGNORECASE)
+        if match and cid not in comments_already_done:
+            comments_already_done.add(cid)
+            print 'Found request:', comment.body
+            if comment.is_root:
+                print 'Not a child of a comment, process the link or self post'
+                submission = reddit.get_submission(submission=comment.submission)
+                if submission.id not in posts_already_done:
+                    if 'reddit.com' not in submission.url:
+                        op_url = submission.url
+                        print 'Post Title', submission.title
+                        print 'Post ID', submission.id
+                        posts_already_done.add(submission.id)
+                        summary = create_summaries(title=submission.title, url=op_url)
+                        if summary.__len__() > 1200:
+                            print 'Summary Length:', summary.__len__()
+                            print 'Rejected for length exceeded'
+                        comment.reply(summary)
+                        posted_this_iteration = True
+                        print 'Posted a Link Post TLDR successfully:', submission.title,
+                        return
+                    else:
+                        op_text = submission.selftext
+                        if not (tldr_already(op_text)) and op_text.__len__() > 1000:
+                            print 'Post Length:', op_text.__len__()
+                            print 'Post Title', submission.title
+                            print 'Post ID', submission.id
+                            posts_already_done.add(submission.id)
+                            summary = create_summaries(title=submission.title, text=op_text)
+                            if summary.__len__() > 750 and 'No Summary' not in summary:
+                                print 'Summary Length:', summary.__len__()
+                                print 'Rejected for length exceeded'
+                            comment.reply(summary)
+                            posted_this_iteration = True
+                            print 'Posted a TLDR successfully', submission.title
+                            return
+            else:
+                print 'Child of comment:', comment.parent_id, '\nFormat into summary of parent'
+                comment_parent = reddit.get_info(thing_id=comment.parent_id).body
+                if not (tldr_already(comment_parent)) and comment_parent.__len__() > 1000:
+                    print 'Post Length:', comment_parent.__len__()
+                    print 'Post Title', comment.submission.title
+                    print 'Post ID', comment.submission.id
+                    summary = create_summaries(title=comment.submission.title, text=comment_parent)
+                    if summary.__len__() > 750 and 'No Summary' not in summary:
+                        print 'Summary Length:', summary.__len__()
+                        print 'Rejected for length exceeded'
+                    comment.reply(summary)
+                    posted_this_iteration = True
+                    print 'Posted a TLDR successfully', comment.submission.title, 'by request of ', comment.author
+                    return
+        comments_already_done.add(cid)
+
+
+def summarize_content_autonomously():
+    print 'Looking for content to summarize'
     subreddit = reddit.get_subreddit('testingground4bots')
     global posted_this_iteration
     for submission in subreddit.get_new(limit=100):
-        if submission.id not in alreadyDone:
+        if submission.id not in posts_already_done:
             if 'reddit.com' not in submission.url:
                 op_url = submission.url
                 print 'Post Title', submission.title
                 print 'Post ID', submission.id
-                alreadyDone.add(submission.id)
+                posts_already_done.add(submission.id)
                 summary = create_summaries(title=submission.title, url=op_url)
                 if summary.__len__() > 1200:
                     print 'Summary Length:', summary.__len__()
@@ -81,7 +161,7 @@ def main():
                     print 'Post Length:', op_text.__len__()
                     print 'Post Title', submission.title
                     print 'Post ID', submission.id
-                    alreadyDone.add(submission.id)
+                    posts_already_done.add(submission.id)
                     summary = create_summaries(title=submission.title, text=op_text)
                     if summary.__len__() > 750 and 'No Summary' not in summary:
                         print 'Summary Length:', summary.__len__()
@@ -90,13 +170,15 @@ def main():
                     posted_this_iteration = True
                     print 'Posted a TLDR successfully', submission.title
                     return
-        alreadyDone.add(submission.id)
+        posts_already_done.add(submission.id)
+
 
 while True:
     global posted_this_iteration
     posted_this_iteration = False
     try:
-        main()
+        task = weighted_choice([(summarize_content_autonomously, 2.5), (check_for_requests, 95)])
+        task()
         if sleep_time > (7*60):
             sleep_time = round(sleep_time/2)
             print 'Sleeping for %d seconds between runs'
@@ -112,3 +194,5 @@ while True:
     if posted_this_iteration:
         posted_this_iteration = False
         time.sleep(sleep_time)
+    else:
+        time.sleep(10)
