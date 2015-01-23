@@ -57,6 +57,51 @@ def tldr_already(text):
         return False
 
 
+def handle_link_post_summary(submission=None, comment=None):
+    global posted_this_iteration
+    op_url = submission.url
+    print 'Post Title', submission.title
+    print 'Post ID', submission.id
+    posts_already_done.add(submission.id)
+    summary = create_summaries(title=submission.title, url=op_url)
+    if summary.__len__() > 1200:
+        print 'Summary Length:', summary.__len__()
+        print 'Rejected for length exceeded'
+    if comment:
+        comment.reply(summary)
+    else:
+        submission.add_comment(summary)
+    posted_this_iteration = True
+    print 'Posted a Link Post TLDR successfully:', submission.title
+    if comment:
+        print 'requested by:', comment.author
+
+def handle_self_post_reply(submission, comment, op_text):
+    global posted_this_iteration
+    print 'Post Length:', op_text.__len__()
+    print 'Post Title', submission.title
+    if comment:
+        print 'Post ID', comment.submission.id
+    else:
+        print 'Post ID', submission.id
+    posts_already_done.add(submission.id)
+    if comment:
+        summary = create_summaries(title=comment.submission.title, text=op_text)
+    else:
+        summary = create_summaries(title=submission.title, text=op_text)
+    if summary.__len__() > 750 and 'No Summary' not in summary:
+        print 'Summary Length:', summary.__len__()
+        print 'Rejected for length exceeded'
+    if comment:
+        comment.reply(summary)
+    else:
+        submission.add_comment(summary)
+    posted_this_iteration = True
+    print 'Posted a Self Text TLDR successfully', submission.title
+    if comment:
+        print 'by request of', comment.author
+
+
 def create_summaries(title=None, text=None, url=None):
     try:
         if url:
@@ -91,84 +136,35 @@ def check_for_requests():
                 submission = reddit.get_submission(submission=comment.submission)
                 if submission.id not in posts_already_done:
                     if 'reddit.com' not in submission.url:
-                        op_url = submission.url
-                        print 'Post Title', submission.title
-                        print 'Post ID', submission.id
-                        posts_already_done.add(submission.id)
-                        summary = create_summaries(title=submission.title, url=op_url)
-                        if summary.__len__() > 1200:
-                            print 'Summary Length:', summary.__len__()
-                            print 'Rejected for length exceeded'
-                        comment.reply(summary)
-                        posted_this_iteration = True
-                        print 'Posted a Link Post TLDR successfully:', submission.title,
+                        handle_link_post_summary(submission=submission, comment=comment)
                         return
                     else:
                         op_text = submission.selftext
                         if not (tldr_already(op_text)) and op_text.__len__() > 1000:
-                            print 'Post Length:', op_text.__len__()
-                            print 'Post Title', submission.title
-                            print 'Post ID', submission.id
-                            posts_already_done.add(submission.id)
-                            summary = create_summaries(title=submission.title, text=op_text)
-                            if summary.__len__() > 750 and 'No Summary' not in summary:
-                                print 'Summary Length:', summary.__len__()
-                                print 'Rejected for length exceeded'
-                            comment.reply(summary)
-                            posted_this_iteration = True
-                            print 'Posted a TLDR successfully', submission.title
+                            handle_self_post_reply(submission, comment, op_text)
                             return
             else:
                 print 'Child of comment:', comment.parent_id, '\nFormat into summary of parent'
                 comment_parent = reddit.get_info(thing_id=comment.parent_id).body
                 if not (tldr_already(comment_parent)) and comment_parent.__len__() > 1000:
-                    print 'Post Length:', comment_parent.__len__()
-                    print 'Post Title', comment.submission.title
-                    print 'Post ID', comment.submission.id
-                    summary = create_summaries(title=comment.submission.title, text=comment_parent)
-                    if summary.__len__() > 750 and 'No Summary' not in summary:
-                        print 'Summary Length:', summary.__len__()
-                        print 'Rejected for length exceeded'
-                    comment.reply(summary)
-                    posted_this_iteration = True
-                    print 'Posted a TLDR successfully', comment.submission.title, 'by request of ', comment.author
+                    handle_self_post_reply(submission=comment.submission, comment=comment, op_text=comment_parent)
                     return
         comments_already_done.add(cid)
 
 
 def summarize_content_autonomously():
     print 'Looking for content to summarize'
-    subreddit = reddit.get_subreddit('testingground4bots')
+    subreddit = reddit.get_subreddit(subreddit_to_scan)
     global posted_this_iteration
     for submission in subreddit.get_new(limit=100):
         if submission.id not in posts_already_done:
             if 'reddit.com' not in submission.url:
-                op_url = submission.url
-                print 'Post Title', submission.title
-                print 'Post ID', submission.id
-                posts_already_done.add(submission.id)
-                summary = create_summaries(title=submission.title, url=op_url)
-                if summary.__len__() > 1200:
-                    print 'Summary Length:', summary.__len__()
-                    print 'Rejected for length exceeded'
-                submission.add_comment(summary)
-                posted_this_iteration = True
-                print 'Posted a Link Post TLDR successfully:', submission.title,
+                handle_link_post_summary(submission=submission)
                 return
             else:
                 op_text = submission.selftext
                 if not (tldr_already(op_text)) and op_text.__len__() > 1000:
-                    print 'Post Length:', op_text.__len__()
-                    print 'Post Title', submission.title
-                    print 'Post ID', submission.id
-                    posts_already_done.add(submission.id)
-                    summary = create_summaries(title=submission.title, text=op_text)
-                    if summary.__len__() > 750 and 'No Summary' not in summary:
-                        print 'Summary Length:', summary.__len__()
-                        print 'Rejected for length exceeded'
-                    submission.add_comment(summary)
-                    posted_this_iteration = True
-                    print 'Posted a TLDR successfully', submission.title
+                    handle_self_post_reply(submission=submission, op_text=op_text)
                     return
         posts_already_done.add(submission.id)
 
@@ -177,22 +173,30 @@ while True:
     global posted_this_iteration
     posted_this_iteration = False
     try:
-        task = weighted_choice([(summarize_content_autonomously, 2.5), (check_for_requests, 95)])
+        task = weighted_choice([(summarize_content_autonomously, 1), (check_for_requests, 99)])
         task()
         if sleep_time > (7*60):
             sleep_time = round(sleep_time/2)
-            print 'Sleeping for %d seconds between runs'
+            print 'Sleeping for %d seconds between runs' % sleep_time
     except Exception as e:
         # if not successful, slow down.
-        if str(e) == "HTTP Error 504: Gateway Time-out" or str(e) == "timed out" or "RateLimitExceeded" in str(e):
+        if str(e) == "HTTP Error 504: Gateway Time-out" or "timed out" in str(e):
             sleep_time = round(sleep_time*2)
             print 'Sleeping for %d seconds between runs' % sleep_time
+            time.sleep(sleep_time)
         else:
             print 'Exception:', e
             traceback.print_exc()
+            if "RateLimitExceeded" in str(e):
+                print 'RATE LIMIT EXCEEDED : ', str(e)
+                sleep_time = round(sleep_time*2)
+                time.sleep(sleep_time)
             pass
+
     if posted_this_iteration:
         posted_this_iteration = False
+        print 'Sleeping for %d seconds' % sleep_time
         time.sleep(sleep_time)
     else:
+        print 'Sleeping for %d seconds' % 10
         time.sleep(10)
