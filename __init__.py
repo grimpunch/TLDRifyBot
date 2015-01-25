@@ -1,3 +1,4 @@
+import logging
 import ConfigParser
 from random import random
 from bisect import bisect
@@ -6,14 +7,25 @@ import re
 import time
 import pyteaser
 import traceback
+import sys
 
 global posted_this_iteration
 
 # System Configuration: ----------------
 sleep_time = 5*60
-subreddit_to_scan = 'testingground4bots'
+subreddit_to_scan = 'all'
+bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind"""
 #################################
 
+# Prepare logging
+logging.basicConfig(level=logging.INFO, filename="logfile", filemode="a+",
+                    format="%(asctime) -15s %(levelname) -8s %(message)s")
+root = logging.getLogger()
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+root.addHandler(ch)
 # Get the account password from the config stored with the bot
 config = ConfigParser.ConfigParser()
 config.read('account.cfg')
@@ -31,7 +43,7 @@ reddit.login(username, password)
 posts_already_done = set()
 comments_already_done = set()
 
-print 'TLDRify online - Logged in and running'
+logging.info('TLDRify online - Logged in and running')
 
 
 def get_subreddit():
@@ -60,46 +72,47 @@ def tldr_already(text):
 def handle_link_post_summary(submission=None, comment=None):
     global posted_this_iteration
     op_url = submission.url
-    print 'Post Title', submission.title
-    print 'Post ID', submission.id
+    logging.info(msg=('Post Title', submission.title))
+    logging.info(msg=('Post ID', submission.id))
     posts_already_done.add(submission.id)
     summary = create_summaries(title=submission.title, url=op_url)
     if summary.__len__() > 1200:
-        print 'Summary Length:', summary.__len__()
-        print 'Rejected for length exceeded'
+        logging.info(msg=('Summary Length:', summary.__len__()))
+        logging.info(msg=('Rejected for length exceeded'))
     if comment:
         comment.reply(summary)
     else:
         submission.add_comment(summary)
     posted_this_iteration = True
-    print 'Posted a Link Post TLDR successfully:', submission.title
+    logging.info(msg=('Posted a Link Post TLDR successfully:', submission.title))
     if comment:
-        print 'requested by:', comment.author
+        logging.info(msg=('requested by:', comment.author))
+
 
 def handle_self_post_reply(submission, comment, op_text):
     global posted_this_iteration
-    print 'Post Length:', op_text.__len__()
-    print 'Post Title', submission.title
+    logging.info(msg=('Post Length:', op_text.__len__()))
+    logging.info(msg=('Post Title', submission.title))
     if comment:
-        print 'Post ID', comment.submission.id
+        logging.info(msg=('Post ID', comment.submission.id))
     else:
-        print 'Post ID', submission.id
+        logging.info(msg=('Post ID', submission.id))
     posts_already_done.add(submission.id)
     if comment:
         summary = create_summaries(title=comment.submission.title, text=op_text)
     else:
         summary = create_summaries(title=submission.title, text=op_text)
     if summary.__len__() > 750 and 'No Summary' not in summary:
-        print 'Summary Length:', summary.__len__()
-        print 'Rejected for length exceeded'
+        logging.info(msg=('Summary Length:', summary.__len__()))
+        logging.info(msg=('Rejected for length exceeded'))
     if comment:
         comment.reply(summary)
     else:
         submission.add_comment(summary)
     posted_this_iteration = True
-    print 'Posted a Self Text TLDR successfully', submission.title
+    logging.info(msg=('Posted a Self Text TLDR successfully', submission.title))
     if comment:
-        print 'by request of', comment.author
+        logging.info(msg=('by request of', comment.author))
 
 
 def create_summaries(title=None, text=None, url=None):
@@ -109,30 +122,31 @@ def create_summaries(title=None, text=None, url=None):
         else:
             summaries = pyteaser.Summarize(title, text)
     except Exception as e:
-        print e
-        print 'No Summary Could Be Generated'
+        logging.error(msg=(e))
+        logging.info(msg=('No Summary Could Be Generated'))
         return None
     if not summaries:
-        print 'No Summary Could Be Generated'
+        logging.info(msg=('No Summary Could Be Generated'))
         return None
     formatted_summary = u'##TLDR: \n\n' + title + u':\n\n'
     for summary in summaries:
         formatted_summary += u'- ' + summary.decode('utf-8', errors='ignore') + u'\n\n'
+    formatted_summary += u'\n\n' + bot_author_message
     return formatted_summary
 
 
 def check_for_requests():
-    print 'Checking for Requests'
+    logging.info(msg=('Checking for Requests'))
     subreddit = get_subreddit()
     global posted_this_iteration
-    for comment in subreddit.get_comments():
+    for comment in subreddit.get_comments(limit=100):
         cid = str(comment.id)
         match = re.search('TL;?DR please', comment.body, re.IGNORECASE)
         if match and cid not in comments_already_done:
             comments_already_done.add(cid)
-            print 'Found request:', comment.body
+            logging.info(msg=('Found request:', comment.body))
             if comment.is_root:
-                print 'Not a child of a comment, process the link or self post'
+                logging.info(msg=('Not a child of a comment, process the link or self post'))
                 submission = reddit.get_submission(submission=comment.submission)
                 if submission.id not in posts_already_done:
                     if 'reddit.com' not in submission.url:
@@ -144,7 +158,7 @@ def check_for_requests():
                             handle_self_post_reply(submission, comment, op_text)
                             return
             else:
-                print 'Child of comment:', comment.parent_id, '\nFormat into summary of parent'
+                logging.info(msg=('Child of comment:', comment.parent_id, '\nFormat into summary of parent'))
                 comment_parent = reddit.get_info(thing_id=comment.parent_id).body
                 if not (tldr_already(comment_parent)) and comment_parent.__len__() > 1000:
                     handle_self_post_reply(submission=comment.submission, comment=comment, op_text=comment_parent)
@@ -153,7 +167,7 @@ def check_for_requests():
 
 
 def summarize_content_autonomously():
-    print 'Looking for content to summarize'
+    logging.info(msg=('Looking for content to summarize'))
     subreddit = reddit.get_subreddit(subreddit_to_scan)
     global posted_this_iteration
     for submission in subreddit.get_new(limit=100):
@@ -177,26 +191,26 @@ while True:
         task()
         if sleep_time > (7*60):
             sleep_time = round(sleep_time/2)
-            print 'Sleeping for %d seconds between runs' % sleep_time
+            logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
     except Exception as e:
         # if not successful, slow down.
         if str(e) == "HTTP Error 504: Gateway Time-out" or "timed out" in str(e):
             sleep_time = round(sleep_time*2)
-            print 'Sleeping for %d seconds between runs' % sleep_time
+            logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
             time.sleep(sleep_time)
         else:
-            print 'Exception:', e
+            logging.info(msg=('Exception:', e))
             traceback.print_exc()
             if "RateLimitExceeded" in str(e):
-                print 'RATE LIMIT EXCEEDED : ', str(e)
+                logging.info(msg=('RATE LIMIT EXCEEDED : ', str(e)))
                 sleep_time = round(sleep_time*2)
                 time.sleep(sleep_time)
             pass
 
     if posted_this_iteration:
         posted_this_iteration = False
-        print 'Sleeping for %d seconds' % sleep_time
+        logging.info(msg=('Sleeping for %d seconds' % sleep_time))
         time.sleep(sleep_time)
     else:
-        print 'Sleeping for %d seconds' % 10
-        time.sleep(10)
+        logging.info(msg=('Sleeping for %d seconds' % sleep_time))
+        time.sleep(sleep_time)
