@@ -1,3 +1,4 @@
 *.cfg
 .idea/*
 .idea
+logfile
