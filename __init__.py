@@ -212,5 +212,5 @@ while True:
         logging.info(msg=('Sleeping for %d seconds' % sleep_time))
         time.sleep(sleep_time)
     else:
-        logging.info(msg=('Sleeping for %d seconds' % sleep_time))
+        logging.info(msg=('Sleeping for %d seconds' % 10))
         time.sleep(10)
