@@ -89,7 +89,7 @@ def handle_link_post_summary(submission=None, comment=None):
         logging.info(msg=('requested by:', comment.author))
 
 
-def handle_self_post_reply(submission, comment, op_text):
+def handle_self_post_reply(submission=None, comment=None, op_text=None):
     global posted_this_iteration
     logging.info(msg=('Post Length:', op_text.__len__()))
     logging.info(msg=('Post Title', submission.title))
@@ -155,7 +155,7 @@ def check_for_requests():
                     else:
                         op_text = submission.selftext
                         if not (tldr_already(op_text)) and op_text.__len__() > 1000:
-                            handle_self_post_reply(submission, comment, op_text)
+                            handle_self_post_reply(submission=submission, comment=comment, op_text=op_text)
                             return
             else:
                 logging.info(msg=('Child of comment:', comment.parent_id, '\nFormat into summary of parent'))
