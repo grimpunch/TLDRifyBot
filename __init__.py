@@ -155,7 +155,7 @@ def check_for_requests():
             logging.info(msg=('Found request:', comment.body))
             if comment.is_root:
                 logging.info(msg=('Not a child of a comment, process the link or self post'))
-                submission = reddit.get_submission(submission_id=comment.submission.id)
+                submission = reddit.get_submission(url=comment.url)
                 if submission.id not in posts_already_done:
                     if 'reddit.com' not in submission.url:
                         handle_link_post_summary(submission=submission, comment=comment)
