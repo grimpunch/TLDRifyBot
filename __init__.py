@@ -17,7 +17,7 @@ subreddit_to_scan = 'all'
 bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind"""
 #################################
 
-# Prepare logging
+# Logging configuration
 logging.basicConfig(level=logging.INFO, filename="logfile", filemode="a+",
                     format="%(asctime) -15s %(levelname) -8s %(message)s")
 root = logging.getLogger()
@@ -26,6 +26,9 @@ ch.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 root.addHandler(ch)
+logging.addLevelName( logging.WARNING, "\033[1;31m%s\033[1;0m" % logging.getLevelName(logging.WARNING))
+logging.addLevelName( logging.ERROR, "\033[1;41m%s\033[1;0m" % logging.getLevelName(logging.ERROR))
+
 # Get the account password from the config stored with the bot
 config = ConfigParser.ConfigParser()
 config.read('account.cfg')
@@ -76,9 +79,12 @@ def handle_link_post_summary(submission=None, comment=None):
     logging.info(msg=('Post ID', submission.id))
     posts_already_done.add(submission.id)
     summary = create_summaries(title=submission.title, url=op_url)
-    if summary.__len__() > 1200:
+    if not summary:
+        return
+    if summary.__len__() > 1100:
         logging.info(msg=('Summary Length:', summary.__len__()))
         logging.info(msg=('Rejected for length exceeded'))
+        return
     if comment:
         comment.reply(summary)
     else:
@@ -102,9 +108,12 @@ def handle_self_post_reply(submission=None, comment=None, op_text=None):
         summary = create_summaries(title=comment.submission.title, text=op_text)
     else:
         summary = create_summaries(title=submission.title, text=op_text)
-    if summary.__len__() > 750 and 'No Summary' not in summary:
+    if not summary:
+        return
+    if summary.__len__() > 1100:
         logging.info(msg=('Summary Length:', summary.__len__()))
-        logging.info(msg=('Rejected for length exceeded'))
+        logging.warning(msg=('Rejected for length exceeded'))
+        return
     if comment:
         comment.reply(summary)
     else:
@@ -122,12 +131,12 @@ def create_summaries(title=None, text=None, url=None):
         else:
             summaries = pyteaser.Summarize(title, text)
     except Exception as e:
-        logging.error(msg=(e))
+        logging.exception(msg=(e))
         logging.info(msg=('No Summary Could Be Generated'))
-        return None
+        return
     if not summaries:
         logging.info(msg=('No Summary Could Be Generated'))
-        return None
+        return
     formatted_summary = u'##TLDR: \n\n' + title + u':\n\n'
     for summary in summaries:
         formatted_summary += u'- ' + summary.decode('utf-8', errors='ignore') + u'\n\n'
@@ -139,7 +148,7 @@ def check_for_requests():
     logging.info(msg=('Checking for Requests'))
     subreddit = get_subreddit()
     global posted_this_iteration
-    for comment in subreddit.get_comments(limit=100):
+    for comment in subreddit.get_comments(limit=None):
         cid = str(comment.id)
         match = re.search('TL;?DR please', comment.body, re.IGNORECASE)
         if match and cid not in comments_already_done:
@@ -147,7 +156,7 @@ def check_for_requests():
             logging.info(msg=('Found request:', comment.body))
             if comment.is_root:
                 logging.info(msg=('Not a child of a comment, process the link or self post'))
-                submission = reddit.get_submission(submission=comment.submission)
+                submission = reddit.get_submission(submission_id=comment.submission.id)
                 if submission.id not in posts_already_done:
                     if 'reddit.com' not in submission.url:
                         handle_link_post_summary(submission=submission, comment=comment)
@@ -199,12 +208,13 @@ while True:
             logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
             time.sleep(sleep_time)
         else:
-            logging.info(msg=('Exception:', e))
-            traceback.print_exc()
+            logging.exception(msg=('Exception:', e))
             if "RateLimitExceeded" in str(e):
                 logging.info(msg=('RATE LIMIT EXCEEDED : ', str(e)))
                 sleep_time = round(sleep_time*2)
                 time.sleep(sleep_time)
+            if "HTTP Error 403" in str(e):
+                logging.warning('Probably banned from somewhere')
             pass
 
     if posted_this_iteration:
@@ -212,5 +222,5 @@ while True:
         logging.info(msg=('Sleeping for %d seconds' % sleep_time))
         time.sleep(sleep_time)
     else:
-        logging.info(msg=('Sleeping for %d seconds' % 10))
-        time.sleep(10)
+        logging.info(msg=('Sleeping for %d seconds' % 8))
+        time.sleep(8)
