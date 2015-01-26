@@ -6,7 +6,6 @@ import praw
 import re
 import time
 import pyteaser
-import traceback
 import sys
 
 global posted_this_iteration
@@ -14,7 +13,7 @@ global posted_this_iteration
 # System Configuration: ----------------
 sleep_time = 5*60
 subreddit_to_scan = 'all'
-bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind"""
+bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind \n\n I can be summoned in a comment if you say 'TLDR please'"""
 #################################
 
 # Logging configuration
