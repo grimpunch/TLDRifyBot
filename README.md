@@ -10,4 +10,4 @@ Python Reddit API Wrapper:
   
 Still a work in progress, uses a config file called 'account.cfg' for the account information in the same directory as the running application
 
-Currently limited to play around in http://www.reddit.com/r/testingground4bots/
+Currently live and running on Reddit. under the name www.reddit.com/u/TLDRify
