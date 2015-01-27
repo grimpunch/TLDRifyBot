@@ -80,7 +80,7 @@ def handle_link_post_summary(submission=None, comment=None):
     summary = create_summaries(title=submission.title, url=op_url)
     if not summary:
         return
-    if summary.__len__() > 1100:
+    if summary.__len__() > 900:
         logging.info(msg=('Summary Length:', summary.__len__()))
         logging.info(msg=('Rejected for length exceeded'))
         return
@@ -109,7 +109,7 @@ def handle_self_post_reply(submission=None, comment=None, op_text=None):
         summary = create_summaries(title=submission.title, text=op_text)
     if not summary:
         return
-    if summary.__len__() > 1100:
+    if summary.__len__() > 900:
         logging.info(msg=('Summary Length:', summary.__len__()))
         logging.warning(msg=('Rejected for length exceeded'))
         return
@@ -155,10 +155,11 @@ def check_for_requests():
             logging.info(msg=('Found request:', comment.body))
             if comment.is_root:
                 logging.info(msg=('Not a child of a comment, process the link or self post'))
-                submission = reddit.get_submission(url=comment.url)
+                submission = reddit.get_submission(url=comment.permalink)
                 if submission.id not in posts_already_done:
                     if 'reddit.com' not in submission.url:
-                        handle_link_post_summary(submission=submission, comment=comment)
+			if 'imgur' not in submission.url and 'youtu' not in submission.url:
+                            handle_link_post_summary(submission=submission, comment=comment)
                         return
                     else:
                         op_text = submission.selftext
@@ -195,7 +196,7 @@ while True:
     global posted_this_iteration
     posted_this_iteration = False
     try:
-        task = weighted_choice([(summarize_content_autonomously, 1), (check_for_requests, 99)])
+        task = weighted_choice([(summarize_content_autonomously, 1), (check_for_requests, 499)])
         task()
         if sleep_time > (7*60):
             sleep_time = round(sleep_time/2)
