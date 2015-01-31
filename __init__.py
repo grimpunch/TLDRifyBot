@@ -158,8 +158,10 @@ def check_for_requests():
                 submission = reddit.get_submission(url=comment.permalink)
                 if submission.id not in posts_already_done:
                     if 'reddit.com' not in submission.url:
-			if 'imgur' not in submission.url and 'youtu' not in submission.url:
+                        if 'imgur' not in submission.url and 'youtu' not in submission.url:
                             handle_link_post_summary(submission=submission, comment=comment)
+                            return
+                        logging.warning("I don't do imgur and youtube links, I'm not that sort of bot.")
                         return
                     else:
                         op_text = submission.selftext
@@ -182,7 +184,10 @@ def summarize_content_autonomously():
     for submission in subreddit.get_new(limit=100):
         if submission.id not in posts_already_done:
             if 'reddit.com' not in submission.url:
-                handle_link_post_summary(submission=submission)
+                if 'imgur' not in submission.url and 'youtu' not in submission.url:
+                    handle_link_post_summary(submission=submission)
+                    return
+                logging.warning("I don't do imgur and youtube links, I'm not that sort of bot.")
                 return
             else:
                 op_text = submission.selftext
