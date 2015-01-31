@@ -45,7 +45,7 @@ reddit.login(username, password)
 posts_already_done = set()
 comments_already_done = set()
 
-logging.info('TLDRify online - Logged in and running')
+logging.info("TLDRify online - Logged in and running")
 
 
 def get_subreddit():
@@ -71,6 +71,14 @@ def tldr_already(text):
         return False
 
 
+def filter_bad_urls(url):
+    bad_urls = ['youtu', 'imgur', 'vid.us', 'vimeo']
+    for bad_url in bad_urls:
+        if bad_url in url:
+            return False
+    return True
+
+
 def handle_link_post_summary(submission=None, comment=None):
     global posted_this_iteration
     op_url = submission.url
@@ -82,7 +90,7 @@ def handle_link_post_summary(submission=None, comment=None):
         return
     if summary.__len__() > 900:
         logging.info(msg=('Summary Length:', summary.__len__()))
-        logging.info(msg=('Rejected for length exceeded'))
+        logging.info(msg='Rejected for length exceeded')
         return
     if comment:
         comment.reply(summary)
@@ -108,10 +116,11 @@ def handle_self_post_reply(submission=None, comment=None, op_text=None):
     else:
         summary = create_summaries(title=submission.title, text=op_text)
     if not summary:
+        logging.warning(msg='A summary could not be generated')
         return
     if summary.__len__() > 900:
         logging.info(msg=('Summary Length:', summary.__len__()))
-        logging.warning(msg=('Rejected for length exceeded'))
+        logging.warning(msg='Rejected for length exceeded')
         return
     if comment:
         comment.reply(summary)
@@ -129,12 +138,12 @@ def create_summaries(title=None, text=None, url=None):
             summaries = pyteaser.SummarizeUrl(url)
         else:
             summaries = pyteaser.Summarize(title, text)
-    except Exception as e:
-        logging.exception(msg=(e))
-        logging.info(msg=('No Summary Could Be Generated'))
+    except Exception as summary_exception:
+        logging.exception(msg=summary_exception.message)
+        logging.info(msg='No Summary Could Be Generated')
         return
     if not summaries:
-        logging.info(msg=('No Summary Could Be Generated'))
+        logging.info(msg='No Summary Could Be Generated')
         return
     formatted_summary = u'##TLDR: \n\n' + title + u':\n\n'
     for summary in summaries:
@@ -143,8 +152,34 @@ def create_summaries(title=None, text=None, url=None):
     return formatted_summary
 
 
+def handle_post_from_comment_request(comment=None):
+    submission = reddit.get_submission(url=comment.permalink)
+    logging.info(msg='Not a child of a comment, process the link or self post')
+    if submission.id not in posts_already_done:
+        if 'reddit.com' not in submission.url:
+            if filter_bad_urls(submission.url):
+                handle_link_post_summary(submission=submission, comment=comment)
+                return
+            else:
+                logging.warning("Filtered possible image/video based link")
+            return
+        else:
+            op_text = submission.selftext
+            if not (tldr_already(op_text)) and op_text.__len__() > 1000:
+                handle_self_post_reply(submission=submission, comment=comment, op_text=op_text)
+                return
+
+
+def handle_comment_from_comment_request(comment=None):
+    comment_parent = reddit.get_info(thing_id=comment.parent_id).body
+    logging.info(msg=('Child of comment:', comment_parent, '\nFormat into summary of parent'))
+    if not (tldr_already(comment_parent)) and comment_parent.__len__() > 1000:
+        handle_self_post_reply(submission=comment.submission, comment=comment, op_text=comment_parent)
+        return
+
+
 def check_for_requests():
-    logging.info(msg=('Checking for Requests'))
+    logging.info(msg='Checking for Requests')
     subreddit = get_subreddit()
     global posted_this_iteration
     for comment in subreddit.get_comments(limit=None):
@@ -152,42 +187,31 @@ def check_for_requests():
         match = re.search('TL;?DR please', comment.body, re.IGNORECASE)
         if match and cid not in comments_already_done:
             comments_already_done.add(cid)
+            if username in comment.author:
+                # Don't reply to the bot itself.
+                logging.info('Found comment from %s , so ignore it' % username)
+                return
             logging.info(msg=('Found request:', comment.body))
             if comment.is_root:
-                logging.info(msg=('Not a child of a comment, process the link or self post'))
-                submission = reddit.get_submission(url=comment.permalink)
-                if submission.id not in posts_already_done:
-                    if 'reddit.com' not in submission.url:
-                        if 'imgur' not in submission.url and 'youtu' not in submission.url:
-                            handle_link_post_summary(submission=submission, comment=comment)
-                            return
-                        logging.warning("I don't do imgur and youtube links, I'm not that sort of bot.")
-                        return
-                    else:
-                        op_text = submission.selftext
-                        if not (tldr_already(op_text)) and op_text.__len__() > 1000:
-                            handle_self_post_reply(submission=submission, comment=comment, op_text=op_text)
-                            return
+                handle_post_from_comment_request(comment)
+                return
             else:
-                logging.info(msg=('Child of comment:', comment.parent_id, '\nFormat into summary of parent'))
-                comment_parent = reddit.get_info(thing_id=comment.parent_id).body
-                if not (tldr_already(comment_parent)) and comment_parent.__len__() > 1000:
-                    handle_self_post_reply(submission=comment.submission, comment=comment, op_text=comment_parent)
-                    return
+                handle_comment_from_comment_request(comment)
         comments_already_done.add(cid)
 
 
 def summarize_content_autonomously():
-    logging.info(msg=('Looking for content to summarize'))
+    logging.info(msg='Looking for content to summarize')
     subreddit = reddit.get_subreddit(subreddit_to_scan)
     global posted_this_iteration
     for submission in subreddit.get_new(limit=100):
         if submission.id not in posts_already_done:
             if 'reddit.com' not in submission.url:
-                if 'imgur' not in submission.url and 'youtu' not in submission.url:
+                if filter_bad_urls(submission.url):
                     handle_link_post_summary(submission=submission)
                     return
-                logging.warning("I don't do imgur and youtube links, I'm not that sort of bot.")
+                else:
+                    logging.warning("Filtered possible image/video based link")
                 return
             else:
                 op_text = submission.selftext
@@ -199,6 +223,7 @@ def summarize_content_autonomously():
 
 while True:
     global posted_this_iteration
+    # noinspection PyRedeclaration
     posted_this_iteration = False
     try:
         task = weighted_choice([(summarize_content_autonomously, 1), (check_for_requests, 499)])
@@ -208,7 +233,7 @@ while True:
             logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
     except Exception as e:
         # if not successful, slow down.
-        if str(e) == "HTTP Error 504: Gateway Time-out" or "timed out" in str(e):
+        if str(e) == "HTTP Error 504: Gateway Time-out" or "503" in str(e):
             sleep_time = round(sleep_time*2)
             logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
             time.sleep(sleep_time)
