@@ -72,9 +72,18 @@ def tldr_already(text):
 
 
 def filter_bad_urls(url):
+    # Avoiding particular content types that are either hard to summarise or just not welcome to be auto-replied to
     bad_urls = ['youtu', 'imgur', 'vid.us', 'vimeo']
     for bad_url in bad_urls:
         if bad_url in url:
+            return False
+    return True
+
+def filter_bad_subreddits(subreddit):
+    # Avoiding particular subs where we think we might not be welcome.
+    bad_subreddits = ['offmychest', 'pics']
+    for sub in bad_subreddits:
+        if sub in subreddit:
             return False
     return True
 
@@ -206,13 +215,20 @@ def summarize_content_autonomously():
     global posted_this_iteration
     for submission in subreddit.get_new(limit=100):
         if submission.id not in posts_already_done:
+            posts_already_done.add(submission.id)
             if 'reddit.com' not in submission.url:
                 if filter_bad_urls(submission.url):
-                    handle_link_post_summary(submission=submission)
-                    return
+                    subreddit_from_submission = submission.subreddit
+                    logging.info('Subreddit this post is from:',submission.subreddit)
+                    if filter_bad_subreddits(str(submission.subreddit)):
+                        handle_link_post_summary(submission=submission)
+                        return
+                    else:
+                        logging.warning('Not going to summarise a post in %s' % subreddit_from_submission)
+                        return
                 else:
                     logging.warning("Filtered possible image/video based link")
-                return
+                    return
             else:
                 op_text = submission.selftext
                 if not (tldr_already(op_text)) and op_text.__len__() > 1000:
