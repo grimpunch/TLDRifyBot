@@ -1,3 +1,4 @@
+#!/usr/bin/python2
 import logging
 import ConfigParser
 from random import random
@@ -30,7 +31,10 @@ logging.addLevelName( logging.ERROR, "\033[1;41m%s\033[1;0m" % logging.getLevelN
 
 # Get the account password from the config stored with the bot
 config = ConfigParser.ConfigParser()
-config.read('account.cfg')
+try:
+    config.read('account.cfg')
+except:
+    logging.exception('Config File problem, does account.cfg exist?')
 
 # Create the Reddit instance for all requests
 reddit = praw.Reddit(user_agent='TLDRify , the summarizer-bot by /u/grimpunch v1.0'
