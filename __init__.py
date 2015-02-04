@@ -196,10 +196,6 @@ def check_for_requests():
         match = re.search('TL;?DR please', comment.body, re.IGNORECASE)
         if match and cid not in comments_already_done:
             comments_already_done.add(cid)
-            if username in comment.author:
-                # Don't reply to the bot itself.
-                logging.info('Found comment from %s , so ignore it' % username)
-                return
             logging.info(msg=('Found request:', comment.body))
             if comment.is_root:
                 handle_post_from_comment_request(comment)
