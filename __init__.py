@@ -7,6 +7,7 @@ import praw
 import re
 import time
 import pyteaser
+from goose import Goose
 import sys
 
 global posted_this_iteration
@@ -15,6 +16,7 @@ global posted_this_iteration
 sleep_time = 5*60
 subreddit_to_scan = 'all'
 bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind \n\n I can be summoned in a comment if you say 'TLDR please'"""
+percentage_of_op_length_limit = 35.0 # How much of the original article length , in percentage of the original article, must a summary be below.
 #################################
 
 # Logging configuration
@@ -101,7 +103,17 @@ def handle_link_post_summary(submission=None, comment=None):
     summary = create_summaries(title=submission.title, url=op_url)
     if not summary:
         return
-    if summary.__len__() > 900:
+    original_content_length = float(str(Goose().extract(url=op_url).cleaned_text.encode('utf-8', 'ignore')).__len__())
+    # Gets the article the same way pyteaser does and checks the length, casting it to a float for testing percentage.
+
+    delta = (float(original_content_length - float(summary.__len__())) / original_content_length)
+    percentage_of_op_length = 100 - (delta*100.0)
+
+    logging.info('content length: %s' % original_content_length)
+    logging.info('summary length: %s' % summary.__len__())
+    logging.info('percentage: %s' % percentage_of_op_length)
+
+    if percentage_of_op_length > percentage_of_op_length_limit:
         logging.info(msg=('Summary Length:', summary.__len__()))
         logging.info(msg='Rejected for length exceeded')
         return
@@ -131,7 +143,15 @@ def handle_self_post_reply(submission=None, comment=None, op_text=None):
     if not summary:
         logging.warning(msg='A summary could not be generated')
         return
-    if summary.__len__() > 900:
+    original_content_length = float(op_text.__len__())
+    delta = (float(original_content_length - float(summary.__len__())) / original_content_length)
+    percentage_of_op_length = 100 - (delta*100.0)
+
+    logging.info('content length: %s' % original_content_length)
+    logging.info('summary length: %s' % summary.__len__())
+    logging.info('percentage: %s' % percentage_of_op_length)
+
+    if percentage_of_op_length > percentage_of_op_length_limit:
         logging.info(msg=('Summary Length:', summary.__len__()))
         logging.warning(msg='Rejected for length exceeded')
         return
@@ -200,7 +220,7 @@ def check_for_requests():
         match = re.search('TL;?DR please', comment.body, re.IGNORECASE)
         if match and cid not in comments_already_done:
             comments_already_done.add(cid)
-            if username in comment.author:
+            if username in str(comment.author):
                 # Don't reply to the bot itself.
                 logging.info('Found comment from %s , so ignore it' % username)
                 return
@@ -223,7 +243,7 @@ def summarize_content_autonomously():
             if 'reddit.com' not in submission.url:
                 if filter_bad_urls(submission.url):
                     subreddit_from_submission = submission.subreddit
-                    logging.info('Subreddit this post is from:',submission.subreddit)
+                    logging.info('Subreddit this post is from - %s' % str(submission.subreddit))
                     if filter_bad_subreddits(str(submission.subreddit)):
                         handle_link_post_summary(submission=submission)
                         return
