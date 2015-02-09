@@ -103,11 +103,10 @@ def handle_link_post_summary(submission=None, comment=None):
     summary = create_summaries(title=submission.title, url=op_url)
     if not summary:
         return
-    original_content_length = float(str(Goose().extract(url=op_url).cleaned_text.encode('utf-8', 'ignore')).__len__())
+    original_content_length = len(str(Goose().extract(url=op_url).cleaned_text.encode('utf-8', 'ignore')))
     # Gets the article the same way pyteaser does and checks the length, casting it to a float for testing percentage.
 
-    delta = (float(original_content_length - float(summary.__len__())) / original_content_length)
-    percentage_of_op_length = 100 - (delta*100.0)
+    percentage_of_op_length = 100 * len(summary) / float(original_content_length)
 
     logging.info('content length: %s' % original_content_length)
     logging.info('summary length: %s' % summary.__len__())
@@ -143,9 +142,8 @@ def handle_self_post_reply(submission=None, comment=None, op_text=None):
     if not summary:
         logging.warning(msg='A summary could not be generated')
         return
-    original_content_length = float(op_text.__len__())
-    delta = (float(original_content_length - float(summary.__len__())) / original_content_length)
-    percentage_of_op_length = 100 - (delta*100.0)
+    original_content_length = len(op_text)
+    percentage_of_op_length = 100 * len(summary) / float(original_content_length)
 
     logging.info('content length: %s' % original_content_length)
     logging.info('summary length: %s' % summary.__len__())
