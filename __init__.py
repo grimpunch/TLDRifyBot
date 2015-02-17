@@ -94,13 +94,13 @@ def filter_bad_subreddits(subreddit):
     return True
 
 
-def handle_link_post_summary(submission=None, comment=None):
+def handle_link_post_summary(submission=None, comment=None, subreddit_origin=None):
     global posted_this_iteration
     op_url = submission.url
     logging.info(msg=('Post Title', submission.title))
     logging.info(msg=('Post ID', submission.id))
     posts_already_done.add(submission.id)
-    summary = create_summaries(title=submission.title, url=op_url)
+    summary = create_summaries(title=submission.title, url=op_url, subreddit_origin=submission.subreddit)
     if not summary:
         return
     original_content_length = len(str(Goose().extract(url=op_url).cleaned_text.encode('utf-8', 'ignore')))
@@ -126,7 +126,7 @@ def handle_link_post_summary(submission=None, comment=None):
         logging.info(msg=('requested by:', comment.author))
 
 
-def handle_self_post_reply(submission=None, comment=None, op_text=None):
+def handle_self_post_reply(submission=None, comment=None, op_text=None, subreddit_origin=None):
     global posted_this_iteration
     logging.info(msg=('Post Length:', op_text.__len__()))
     logging.info(msg=('Post Title', submission.title))
@@ -136,9 +136,9 @@ def handle_self_post_reply(submission=None, comment=None, op_text=None):
         logging.info(msg=('Post ID', submission.id))
     posts_already_done.add(submission.id)
     if comment:
-        summary = create_summaries(title=comment.submission.title, text=op_text)
+        summary = create_summaries(title=comment.submission.title, text=op_text, subreddit_origin=subreddit_origin)
     else:
-        summary = create_summaries(title=submission.title, text=op_text)
+        summary = create_summaries(title=submission.title, text=op_text, subreddit_origin=subreddit_origin)
     if not summary:
         logging.warning(msg='A summary could not be generated')
         return
@@ -163,7 +163,7 @@ def handle_self_post_reply(submission=None, comment=None, op_text=None):
         logging.info(msg=('by request of', comment.author))
 
 
-def create_summaries(title=None, text=None, url=None):
+def create_summaries(title=None, text=None, url=None, subreddit_origin=None):
     try:
         if url:
             summaries = pyteaser.SummarizeUrl(url)
@@ -176,10 +176,16 @@ def create_summaries(title=None, text=None, url=None):
     if not summaries:
         logging.info(msg='No Summary Could Be Generated')
         return
-    formatted_summary = u'##TLDR: \n\n' + title + u':\n\n'
+    TLDR_header = u'##TLDR: \n\n'
+    if subreddit_origin == "legaladvice":
+        TLDR_header = '##OBJECTION!\n\n#TLDR:\n\n'
+        logging.info('Making special summary for my buddies at /r/legaladvice')
+    formatted_summary = TLDR_header + title + u':\n\n'
     for summary in summaries:
         formatted_summary += u'- ' + summary.decode('utf-8', errors='ignore') + u'\n\n'
     formatted_summary += u'\n\n' + bot_author_message
+    if subreddit_origin == "legaladvice":
+        formatted_summary += u'\n\n Thanks for using my bot /r/legaladvice!'
     return formatted_summary
 
 
@@ -189,7 +195,7 @@ def handle_post_from_comment_request(comment=None):
     if submission.id not in posts_already_done:
         if 'reddit.com' not in submission.url:
             if filter_bad_urls(submission.url):
-                handle_link_post_summary(submission=submission, comment=comment)
+                handle_link_post_summary(submission=submission, comment=comment, subreddit_origin=submission.subreddit)
                 return
             else:
                 logging.warning("Filtered possible image/video based link")
@@ -197,7 +203,7 @@ def handle_post_from_comment_request(comment=None):
         else:
             op_text = submission.selftext
             if not (tldr_already(op_text)) and op_text.__len__() > 1000:
-                handle_self_post_reply(submission=submission, comment=comment, op_text=op_text)
+                handle_self_post_reply(submission=submission, comment=comment, subreddit_origin=submission.subreddit, op_text=op_text)
                 return
 
 
