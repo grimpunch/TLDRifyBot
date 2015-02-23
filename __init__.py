@@ -177,14 +177,14 @@ def create_summaries(title=None, text=None, url=None, subreddit_origin=None):
         logging.info(msg='No Summary Could Be Generated')
         return
     TLDR_header = u'##TLDR: \n\n'
-    if subreddit_origin == "legaladvice":
+    if str(subreddit_origin) == "legaladvice":
         TLDR_header = '##OBJECTION!\n\n#TLDR:\n\n'
         logging.info('Making special summary for my buddies at /r/legaladvice')
     formatted_summary = TLDR_header + title + u':\n\n'
     for summary in summaries:
         formatted_summary += u'- ' + summary.decode('utf-8', errors='ignore') + u'\n\n'
     formatted_summary += u'\n\n' + bot_author_message
-    if subreddit_origin == "legaladvice":
+    if str(subreddit_origin) == "legaladvice":
         formatted_summary += u'\n\n Thanks for using my bot /r/legaladvice!'
     return formatted_summary
 
