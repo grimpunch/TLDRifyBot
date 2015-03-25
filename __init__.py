@@ -17,6 +17,7 @@ sleep_time = 5*60
 subreddit_to_scan = 'all'
 bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind \n\n I can be summoned in a comment if you say 'TLDR please'"""
 percentage_of_op_length_limit = 35.0 # How much of the original article length , in percentage of the original article, must a summary be below.
+negative_feedback_threshold = -1 # Score a TLDR must be on Reddit before we go back and delete it because it's unloved </3
 #################################
 
 # Logging configuration
@@ -215,6 +216,25 @@ def handle_comment_from_comment_request(comment=None):
         return
 
 
+def check_old_posts():
+    logging.info(msg='Checking old posts negative feedback')
+    user = reddit.get_redditor(username)
+    own_posts = user.get_comments()
+    bad_posts_found = False
+    for post in own_posts:
+        if post.score <= negative_feedback_threshold:
+            bad_posts_found = True
+            logging.info('Removing TLDR of "%s" in "%s", because it had a score of %s' % (post.submission.title, post.subreddit,post.score))
+            post.delete()
+    if bad_posts_found:
+        logging.info("Old posts with negative feedback deleted")
+        bad_posts_found = False
+        return
+    else:
+        logging.info("No negative feedback found, keep on truckin'")
+        return
+
+
 def check_for_requests():
     logging.info(msg='Checking for Requests')
     subreddit = get_subreddit()
@@ -270,7 +290,7 @@ while True:
     # noinspection PyRedeclaration
     posted_this_iteration = False
     try:
-        task = weighted_choice([(summarize_content_autonomously, 1), (check_for_requests, 499)])
+        task = weighted_choice([(summarize_content_autonomously, 1), (check_old_posts, 50), (check_for_requests, 449)])
         task()
         if sleep_time > (7*60):
             sleep_time = round(sleep_time/2)
