@@ -228,7 +228,6 @@ def check_old_posts():
             post.delete()
     if bad_posts_found:
         logging.info("Old posts with negative feedback deleted")
-        bad_posts_found = False
         return
     else:
         logging.info("No negative feedback found, keep on truckin'")
