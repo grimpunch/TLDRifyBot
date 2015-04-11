@@ -18,6 +18,15 @@ subreddit_to_scan = 'all'
 bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind \n\n I can be summoned in a comment if you say 'TLDR please'"""
 percentage_of_op_length_limit = 35.0 # How much of the original article length , in percentage of the original article, must a summary be below.
 negative_feedback_threshold = -1 # Score a TLDR must be on Reddit before we go back and delete it because it's unloved </3
+subreddit_from_submission = None # Defined in global scope so we can reference the value from exceptions
+bad_subreddits = []
+
+with open('badsubreddits') as bs:
+    for l in bs.readlines():
+        bad_subreddits.append(l.strip())
+    bs.close()
+
+logging.info('Ignoring requests and not autonomously processing posts from %s' % [x for x in bad_subreddits])
 #################################
 
 # Logging configuration
@@ -67,7 +76,6 @@ def sleep(time_to_sleep=sleep_time_setting):
     """Wraps sleeping with a default sleep amount we usually use, and the functionality to log it"""
     logging.info(msg=('Sleeping for %d seconds between runs' % time_to_sleep))
     time.sleep(time_to_sleep)
-    return
 
 def weighted_choice(choices):
     values, weights = zip(*choices)
@@ -98,11 +106,19 @@ def filter_bad_urls(url):
 
 def filter_bad_subreddits(subreddit):
     # Avoiding particular subs where we think we might not be welcome.
-    bad_subreddits = ['offmychest', 'pics']
     for sub in bad_subreddits:
         if sub in subreddit:
             return False
     return True
+
+def add_bad_subreddit(badsub=None):
+    if badsub not in bad_subreddits:
+        with open('badsubreddits', 'a') as bs:
+            bs.write('\n'+badsub)
+            bs.close()
+        logging.info('Adding %s to list of bad_subreddits not to work in, due to banning or massive unpopularity')
+        bad_subreddits.append(badsub)
+    return
 
 
 def handle_link_post_summary(submission=None, comment=None, subreddit_origin=None):
@@ -233,6 +249,8 @@ def check_old_posts():
     bad_posts_found = False
     for post in own_posts:
         if post.score <= negative_feedback_threshold:
+            if post.score <= negative_feedback_threshold * 3: # Massively unpopular, cohesively unwanted
+                add_bad_subreddit(str(post.subreddit))
             bad_posts_found = True
             logging.info('Removing TLDR of "%s" in "%s", because it had a score of %s' % (post.submission.title, post.subreddit,post.score))
             post.delete()
@@ -297,6 +315,7 @@ while True:
     global posted_this_iteration
     # noinspection PyRedeclaration
     posted_this_iteration = False
+
     try:
         task = weighted_choice([(summarize_content_autonomously, 1), (check_old_posts, 50), (check_for_requests, 449)])
         task()
@@ -319,7 +338,8 @@ while True:
                 sleep(round(sleep_time_setting*2))
 
             if "HTTP Error 403" in str(e):
-                logging.warning('Probably banned from somewhere')
+                logging.warning('Probably banned from %s' % subreddit_from_submission)
+                add_bad_subreddit(str(subreddit_from_submission))
             pass
 
     if len(comments_already_done) >= 2500 or len(posts_already_done) >= 2500:
