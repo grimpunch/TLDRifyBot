@@ -19,15 +19,6 @@ bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpu
 percentage_of_op_length_limit = 35.0 # How much of the original article length , in percentage of the original article, must a summary be below.
 negative_feedback_threshold = -1 # Score a TLDR must be on Reddit before we go back and delete it because it's unloved </3
 subreddit_from_submission = None # Defined in global scope so we can reference the value from exceptions
-bad_subreddits = []
-
-with open('badsubreddits') as bs:
-    for l in bs.readlines():
-        bad_subreddits.append(l.strip())
-    bs.close()
-
-logging.info('Ignoring requests and not autonomously processing posts from %s' % [x for x in bad_subreddits])
-#################################
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, filename="logfile", filemode="a+",
@@ -52,7 +43,6 @@ except:
 reddit = praw.Reddit(user_agent='TLDRify , the summarizer-bot by /u/grimpunch v1.0'
                                 'URL: http://tldrbot.christiancod.es')
 
-
 # Parse account details from config and login
 username = config.get('AccountDetails', 'user', raw=True)
 password = config.get('AccountDetails', 'pass', raw=True)
@@ -60,6 +50,16 @@ reddit.login(username, password)
 
 posts_already_done = set()
 comments_already_done = set()
+
+#################################
+bad_subreddits = []
+
+with open('badsubreddits') as bs:
+    for l in bs.readlines():
+        bad_subreddits.append(l.strip())
+    bs.close()
+logging.info('Ignoring requests and not autonomously processing posts from %s' % str(bad_subreddits).strip('[]'))
+#################################
 
 logging.info("TLDRify online - Logged in and running")
 
