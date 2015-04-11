@@ -13,7 +13,7 @@ import sys
 global posted_this_iteration
 
 # System Configuration: ----------------
-sleep_time = 5*60
+sleep_time_setting = 5*60
 subreddit_to_scan = 'all'
 bot_author_message = """---------------\n\nHi I'm a bot! I was made by /u/grimpunch, if I've gone awry, message him and he'll come fix me. \n\n If you don't want me in your sub, it's okay to ban me I won't mind \n\n I can be summoned in a comment if you say 'TLDR please'"""
 percentage_of_op_length_limit = 35.0 # How much of the original article length , in percentage of the original article, must a summary be below.
@@ -63,6 +63,11 @@ def cleanup_memory_usage():
     posts_already_done.clear()
     comments_already_done.clear()
 
+def sleep(time_to_sleep=sleep_time_setting):
+    """Wraps sleeping with a default sleep amount we usually use, and the functionality to log it"""
+    logging.info(msg=('Sleeping for %d seconds between runs' % time_to_sleep))
+    time.sleep(time_to_sleep)
+    return
 
 def weighted_choice(choices):
     values, weights = zip(*choices)
@@ -286,7 +291,6 @@ def summarize_content_autonomously():
                 if not (tldr_already(op_text)) and op_text.__len__() > 1000:
                     handle_self_post_reply(submission=submission, op_text=op_text)
                     return
-        posts_already_done.add(submission.id)
 
 
 while True:
@@ -296,40 +300,34 @@ while True:
     try:
         task = weighted_choice([(summarize_content_autonomously, 1), (check_old_posts, 50), (check_for_requests, 449)])
         task()
-        if sleep_time > (7*60):
-            sleep_time = round(sleep_time/2)
-            logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
+        if sleep_time_setting > (7*60):
+            sleep_time_setting = round(sleep_time_setting/2)
+            logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time_setting))
+        if sleep_time_setting < 3*60:
+            sleep_time_setting = round(5*60)
     except Exception as e:
         # if not successful, slow down.
         if str(e) == "HTTP Error 504: Gateway Time-out" or "503" in str(e):
-            sleep_time = round(sleep_time*2)
-            logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
-            time.sleep(sleep_time)
+            sleep(round(sleep_time_setting*2))
         elif "MemoryError" in str(e):
             cleanup_memory_usage()
-            sleep_time = round(sleep_time*4)
-            logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
-            time.sleep(sleep_time)
+            sleep(sleep_time_setting*4)
         else:
             logging.exception(msg=('Exception:', e))
             if "RateLimitExceeded" in str(e):
                 logging.info(msg=('RATE LIMIT EXCEEDED : ', str(e)))
-                sleep_time = round(sleep_time*2)
-                time.sleep(sleep_time)
+                sleep(round(sleep_time_setting*2))
+
             if "HTTP Error 403" in str(e):
                 logging.warning('Probably banned from somewhere')
             pass
 
     if len(comments_already_done) >= 2500 or len(posts_already_done) >= 2500:
         cleanup_memory_usage()
-        sleep_time = round(sleep_time*4)
-        logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
-        time.sleep(sleep_time)
+        sleep(round(sleep_time_setting*4))
 
     if posted_this_iteration:
         posted_this_iteration = False
-        logging.info(msg=('Sleeping for %d seconds' % sleep_time))
-        time.sleep(sleep_time)
+        sleep()
     else:
-        logging.info(msg=('Sleeping for %d seconds' % 10))
-        time.sleep(10)
+        sleep(10)
