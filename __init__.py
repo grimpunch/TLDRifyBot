@@ -58,6 +58,11 @@ logging.info("TLDRify online - Logged in and running")
 def get_subreddit():
     return reddit.get_subreddit(subreddit_to_scan)
 
+def cleanup_memory_usage():
+    logging.info('Sets for posts or comments processed getting large, cleaning up')
+    posts_already_done.clear()
+    comments_already_done.clear()
+
 
 def weighted_choice(choices):
     values, weights = zip(*choices)
@@ -242,18 +247,18 @@ def check_for_requests():
         cid = str(comment.id)
         match = re.search('TL;?DR please', comment.body, re.IGNORECASE)
         if match and cid not in comments_already_done:
-            comments_already_done.add(cid)
             if username in str(comment.author):
                 # Don't reply to the bot itself.
                 logging.info('Found comment from %s , so ignore it' % username)
                 return
             logging.info(msg=('Found request:', comment.body))
+            comments_already_done.add(cid)
             if comment.is_root:
                 handle_post_from_comment_request(comment)
                 return
             else:
                 handle_comment_from_comment_request(comment)
-        comments_already_done.add(cid)
+
 
 
 def summarize_content_autonomously():
@@ -300,6 +305,11 @@ while True:
             sleep_time = round(sleep_time*2)
             logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
             time.sleep(sleep_time)
+        elif "MemoryError" in str(e):
+            cleanup_memory_usage()
+            sleep_time = round(sleep_time*4)
+            logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
+            time.sleep(sleep_time)
         else:
             logging.exception(msg=('Exception:', e))
             if "RateLimitExceeded" in str(e):
@@ -310,10 +320,16 @@ while True:
                 logging.warning('Probably banned from somewhere')
             pass
 
+    if len(comments_already_done) >= 2500 or len(posts_already_done) >= 2500:
+        cleanup_memory_usage()
+        sleep_time = round(sleep_time*4)
+        logging.info(msg=('Sleeping for %d seconds between runs' % sleep_time))
+        time.sleep(sleep_time)
+
     if posted_this_iteration:
         posted_this_iteration = False
         logging.info(msg=('Sleeping for %d seconds' % sleep_time))
         time.sleep(sleep_time)
     else:
-        logging.info(msg=('Sleeping for %d seconds' % 8))
-        time.sleep(8)
+        logging.info(msg=('Sleeping for %d seconds' % 10))
+        time.sleep(10)
