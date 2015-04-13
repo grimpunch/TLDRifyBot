@@ -90,7 +90,7 @@ def weighted_choice(choices):
 
 
 def tldr_already(text):
-    if re.findall('((i)T[^\w]*L[^\w]*D[^\w]*R)', text).__len__() > 0:
+    if re.findall('((?i)T[^\w]*L[^\w]*D[^\w]*R)', text).__len__() > 0:
         return True
     else:
         return False
