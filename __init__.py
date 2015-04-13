@@ -116,7 +116,7 @@ def add_bad_subreddit(badsub=None):
         with open('badsubreddits', 'a') as bs:
             bs.write('\n'+badsub)
             bs.close()
-        logging.info('Adding %s to list of bad_subreddits not to work in, due to banning or massive unpopularity')
+        logging.info('Adding %s to list of bad_subreddits not to work in, due to banning or massive unpopularity' % badsub)
         bad_subreddits.append(badsub)
     return
 
